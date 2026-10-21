@@ -41,7 +41,7 @@ Depending on your location, you may have the following rights:
 - The right of rectification.
 - The right to object.
 - The right of restriction.
-- The right to data portability.
+- The right to data portability. `GET /api/v1/users/me/data-export` returns a JSON copy of account and preference records. `POST /api/v1/users/me/deletion-request` runs that export first, then queues erasure, so a portable copy is always issued before deletion proceeds.
 - The right to withdraw consent.
 
 ## 6. Contact Us

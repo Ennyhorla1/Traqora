@@ -68,6 +68,8 @@ describe('GDPR data export and deletion requests (issue #386)', () => {
       expect(res.status).toBe(202);
       expect(res.body.data.status).toBe('pending');
       expect(res.body.alreadyPending).toBe(false);
+      expect(res.body.dataExport.userId).toBe(WALLET);
+      expect(res.body.dataExport.omitted).toBeDefined();
 
       const repo = AppDataSource.getRepository(AccountDeletionRequest);
       const stored = await repo.findOne({ where: { userId: WALLET } });

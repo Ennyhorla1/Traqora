@@ -60,6 +60,19 @@ Smart contracts must be deployed *first* to obtain the Contract IDs needed by th
 
 ### Step 3: Run Database Migrations
 - [ ] Backup the existing production database before executing migrations.
+- [ ] Prove the backup restores before migrating (issue #703). File-based drill:
+  ```bash
+  npm run db:backup -- --data ./var/db-snapshot.json --out ./var/db-snapshot.backup.json
+  npm run db:restore -- --backup ./var/db-snapshot.backup.json --data ./var/db-snapshot.json
+  npm run test:backup-restore
+  ```
+  Production Postgres:
+  ```bash
+  pg_dump "$DATABASE_URL" --format=custom --file=backup.dump
+  pg_restore --clean --if-exists --dbname="$DATABASE_URL" backup.dump
+  ```
+  Restore must fail closed if the snapshot is missing or is not a `{ tables: [] }` object.
+- [ ] Confirm the migration is expand-only (`npm run check:migrations`) per `docs/operations/MIGRATION_ZERO_DOWNTIME.md`.
 - [ ] Run the database migration script to update the schema:
   ```bash
   # Example migration command (if packages/backend uses a CLI/migration command)

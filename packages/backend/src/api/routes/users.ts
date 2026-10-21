@@ -1,5 +1,6 @@
 import { Router, Request, Response } from 'express';
 import { z } from 'zod';
+import { buildUserDataExport, runErasureExportFlow } from '../../services/gdprErasureExport';
 
 
 const router = Router();
@@ -108,16 +109,11 @@ router.get(
       preferenceRepo.findOne({ where: { userId: walletAddress } }),
     ]);
 
-    const exportPayload = {
-      exportedAt: new Date().toISOString(),
+    const exportPayload = buildUserDataExport({
       userId: walletAddress,
-      account: user ?? null,
-      preferences: preferences ?? null,
-      omitted: {
-        bookings: 'not linked to a wallet-based user identity in the current schema',
-        passengers: 'not linked to a wallet-based user identity in the current schema',
-      },
-    };
+      account: user,
+      preferences,
+    });
 
     logger.info('gdpr: data export generated', { userId: walletAddress });
 
@@ -151,24 +147,43 @@ router.post(
     }
 
     const deletionRepo = AppDataSource.getRepository(AccountDeletionRequest);
+    const userRepo = AppDataSource.getRepository(User);
+    const preferenceRepo = AppDataSource.getRepository(UserPreference);
 
-    const existingPending = await deletionRepo.findOne({
-      where: { userId: walletAddress, status: 'pending' },
-    });
-    if (existingPending) {
-      return res.status(200).json({ success: true, data: existingPending, alreadyPending: true });
-    }
+    const [user, preferences, existingPending] = await Promise.all([
+      userRepo.findOne({ where: { walletAddress } }),
+      preferenceRepo.findOne({ where: { userId: walletAddress } }),
+      deletionRepo.findOne({ where: { userId: walletAddress, status: 'pending' } }),
+    ]);
 
-    const request = deletionRepo.create({
+    const result = await runErasureExportFlow({
       userId: walletAddress,
-      status: 'pending',
+      account: user,
+      preferences,
       reason: parsed.data.reason ?? null,
+      existingPending,
+      createRequest: async ({ userId, reason }) => {
+        const request = deletionRepo.create({
+          userId,
+          status: 'pending',
+          reason,
+        });
+        return deletionRepo.save(request);
+      },
     });
-    await deletionRepo.save(request);
 
-    logger.info('gdpr: deletion request created', { userId: walletAddress, requestId: request.id });
+    logger.info('gdpr: erasure export flow', {
+      userId: walletAddress,
+      requestId: result.deletionRequest.id,
+      alreadyPending: result.alreadyPending,
+    });
 
-    return res.status(202).json({ success: true, data: request, alreadyPending: false });
+    return res.status(result.alreadyPending ? 200 : 202).json({
+      success: true,
+      data: result.deletionRequest,
+      alreadyPending: result.alreadyPending,
+      dataExport: result.dataExport,
+    });
   }),
 );
 

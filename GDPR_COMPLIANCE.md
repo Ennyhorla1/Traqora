@@ -52,7 +52,7 @@ The 7-year maximum reflects fiscal/legal record-keeping obligations; records mov
 
 | Stage | Window | Behaviour |
 | --- | --- | --- |
-| Request received | Day 0 | `POST /users/me/deletion-request` creates an auditable `pending` request |
+| Request received | Day 0 | `POST /users/me/deletion-request` creates an auditable `pending` request and returns a `dataExport` snapshot (Art. 20 before Art. 17). Export construction runs first; if it throws, no deletion row is inserted. |
 | Identity verification window | 30 days | Request stays `pending`; user may cancel or confirm |
 | Erasure executed | After 30 days | `DataRetentionService.processDeletionRequests()` marks the request `completed` and downstream erasure of the account's PII proceeds |
 | Request audit record retained | Up to 90 further days | The request row is kept to evidence lawful processing |

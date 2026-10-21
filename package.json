@@ -17,6 +17,13 @@
     "test:pr-template": "jest scripts/__tests__/lint-pr-template.test.js",
     "typecheck": "npm run typecheck --workspaces",
     "test:scripts": "bash scripts/tests/network-guard.test.sh",
+    "check:env-drift": "node scripts/check-backend-env-drift.js --example env.example",
+    "check:migrations": "node scripts/check-migration-zero-downtime.js",
+    "db:backup": "node scripts/db-backup-restore.js backup",
+    "db:restore": "node scripts/db-backup-restore.js restore",
+    "test:env-drift": "jest scripts/__tests__/check-backend-env-drift.test.js",
+    "test:migrations-policy": "jest scripts/__tests__/check-migration-zero-downtime.test.js",
+    "test:backup-restore": "jest scripts/__tests__/db-backup-restore.test.js",
     "clean": "npm run clean --workspaces"
   },
   "devDependencies": {

@@ -87,3 +87,32 @@ fn test_refund_flow() {
     assert_eq!(booking.status, Symbol::new(&env, "refunded"));
     assert_eq!(booking.amount_escrowed, 0);
 }
+
+#[test]
+#[should_panic(expected = "Invalid booking state transition")]
+fn test_concurrent_or_illegal_transition_completed_to_refund() {
+    let env = new_env();
+    let actors = generate_actors(&env);
+    let contracts = register_contracts(&env);
+    initialize_token(&env, &contracts.token, &actors.admin);
+
+    let price = 50_0000000i128;
+    let booking_id = contracts.booking.create_booking(
+        &actors.passenger,
+        &actors.airline,
+        &Symbol::new(&env, "FLCONCUR"),
+        &Symbol::new(&env, "JFK"),
+        &Symbol::new(&env, "LAX"),
+        &2_000_000_000,
+        &price,
+        &contracts.token.address,
+    );
+
+    contracts.token.mint(&actors.admin, &actors.passenger, &price);
+    contracts.booking.pay_for_booking(&booking_id);
+    contracts.booking.release_payment_to_airline(&booking_id);
+
+    // Attempting refund on a completed booking should violate state transition rules
+    contracts.booking.refund_passenger(&booking_id);
+}
+

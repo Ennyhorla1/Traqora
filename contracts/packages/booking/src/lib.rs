@@ -181,6 +181,10 @@ impl BookingContract {
 
     // Accept payment for the booking and hold in escrow
     pub fn pay_for_booking(env: Env, booking_id: u64) {
+        let mut booking = Self::get_booking(env.clone(), booking_id).unwrap();
+        if booking.status != Symbol::new(&env, "pending") {
+            panic!("Invalid booking state transition");
+        }
         let mut booking = BookingStorage::get(&env, booking_id).expect("Booking not found");
 
         assert!(
@@ -232,6 +236,10 @@ impl BookingContract {
 
     // Release payment to airline - post-flight settlement
     pub fn release_payment_to_airline(env: Env, booking_id: u64) {
+        let mut booking = Self::get_booking(env.clone(), booking_id).unwrap();
+        if booking.status != Symbol::new(&env, "confirmed") {
+            panic!("Invalid booking state transition");
+        }
         let mut booking = BookingStorage::get(&env, booking_id).expect("Booking not found");
 
         booking.airline.require_auth();
@@ -271,6 +279,10 @@ impl BookingContract {
 
     // Refund passenger for cancelled bookings
     pub fn refund_passenger(env: Env, booking_id: u64) {
+        let mut booking = Self::get_booking(env.clone(), booking_id).unwrap();
+        if booking.status != Symbol::new(&env, "confirmed") {
+            panic!("Invalid booking state transition");
+        }
         let mut booking = BookingStorage::get(&env, booking_id).expect("Booking not found");
 
         let current_time = env.ledger().timestamp();

@@ -53,6 +53,45 @@ fn test_payment_escrow_flow() {
 }
 
 #[test]
+fn test_enforce_legal_state_transitions_and_concurrency() {
+    let env = new_env();
+    let actors = generate_actors(&env);
+    let contracts = register_contracts(&env);
+    initialize_token(&env, &contracts.token, &actors.admin);
+
+    let price = 100_0000000i128;
+    let booking_id = contracts.booking.create_booking(
+        &actors.passenger,
+        &actors.airline,
+        &Symbol::new(&env, "FL999"),
+        &Symbol::new(&env, "JFK"),
+        &Symbol::new(&env, "LAX"),
+        &2000000000,
+        &price,
+        &contracts.token.address,
+    );
+
+    // Cannot release payment while pending
+    let res_release = contracts.booking.try_release_payment_to_airline(&booking_id);
+    assert!(res_release.is_err());
+
+    // Pay for booking
+    contracts.token.mint(&actors.admin, &actors.passenger, &price);
+    contracts.booking.pay_for_booking(&booking_id);
+
+    // Cannot pay again (concurrent/duplicate attempt)
+    let res_pay_again = contracts.booking.try_pay_for_booking(&booking_id);
+    assert!(res_pay_again.is_err());
+
+    // Complete booking
+    contracts.booking.release_payment_to_airline(&booking_id);
+
+    // Cannot refund after completion
+    let res_refund = contracts.booking.try_refund_passenger(&booking_id);
+    assert!(res_refund.is_err());
+}
+
+#[test]
 fn test_refund_flow() {
     let env = new_env();
     env.ledger().set_timestamp(1700000000);

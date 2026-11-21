@@ -92,6 +92,38 @@ fn test_enforce_legal_state_transitions_and_concurrency() {
 }
 
 #[test]
+fn test_concurrent_booking_transition_attempts() {
+    let env = new_env();
+    let actors = generate_actors(&env);
+    let contracts = register_contracts(&env);
+    initialize_token(&env, &contracts.token, &actors.admin);
+
+    let price = 100_0000000i128;
+    let booking_id = contracts.booking.create_booking(
+        &actors.passenger,
+        &actors.airline,
+        &Symbol::new(&env, "FL777"),
+        &Symbol::new(&env, "JFK"),
+        &Symbol::new(&env, "LAX"),
+        &2000000000,
+        &price,
+        &contracts.token.address,
+    );
+
+    contracts.token.mint(&actors.admin, &actors.passenger, &price);
+
+    // Simulate concurrent or duplicate payment attempts
+    contracts.booking.pay_for_booking(&booking_id);
+    let second_pay = contracts.booking.try_pay_for_booking(&booking_id);
+    assert!(second_pay.is_err());
+
+    // Simulate concurrent or duplicate release attempts
+    contracts.booking.release_payment_to_airline(&booking_id);
+    let second_release = contracts.booking.try_release_payment_to_airline(&booking_id);
+    assert!(second_release.is_err());
+}
+
+#[test]
 fn test_refund_flow() {
     let env = new_env();
     env.ledger().set_timestamp(1700000000);

@@ -181,7 +181,6 @@ impl BookingContract {
 
     // Accept payment for the booking and hold in escrow
     pub fn pay_for_booking(env: Env, booking_id: u64) {
-        // Concurrency guard / reentrancy check via transition mutex lock flag or status check
         let mut booking = BookingStorage::get(&env, booking_id).expect("Booking not found");
 
         assert!(
@@ -189,7 +188,6 @@ impl BookingContract {
             "Already paid or cancelled"
         );
 
-        // Set transient/status guard flag to prevent concurrent double processing
         booking.status = symbol_short!("processing");
         BookingStorage::set(&env, booking_id, &booking);
         let mut booking = BookingStorage::get(&env, booking_id).expect("Booking not found");
@@ -247,6 +245,10 @@ impl BookingContract {
 
         booking.airline.require_auth();
 
+        let mut booking = BookingStorage::get(&env, booking_id).expect("Booking not found");
+
+        booking.airline.require_auth();
+
         assert!(
             booking.status == symbol_short!("confirmed"),
             "Invalid booking status"
@@ -256,8 +258,6 @@ impl BookingContract {
         booking.status = symbol_short!("processing");
         BookingStorage::set(&env, booking_id, &booking);
         let mut booking = BookingStorage::get(&env, booking_id).expect("Booking not found");
-
-        booking.airline.require_auth();
 
         assert!(
             booking.status == symbol_short!("confirmed"),
@@ -298,8 +298,8 @@ impl BookingContract {
 
         let current_time = env.ledger().timestamp();
 
-        // For simplicity, require passenger auth and check window
-        // In a real app, airline could also trigger this
+        let current_time = env.ledger().timestamp();
+
         booking.passenger.require_auth();
         assert!(
             current_time < booking.departure_time - 86400,
@@ -318,8 +318,6 @@ impl BookingContract {
 
         let current_time = env.ledger().timestamp();
 
-        // For simplicity, require passenger auth and check window
-        // In a real app, airline could also trigger this
         booking.passenger.require_auth();
         assert!(
             current_time < booking.departure_time - 86400,

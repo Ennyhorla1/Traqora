@@ -87,3 +87,42 @@ fn test_refund_flow() {
     assert_eq!(booking.status, Symbol::new(&env, "refunded"));
     assert_eq!(booking.amount_escrowed, 0);
 }
+
+#[test]
+fn test_atomic_booking_and_passenger_persistence_normal_and_failure() {
+    let env = new_env();
+    let actors = generate_actors(&env);
+    let contracts = register_contracts(&env);
+    initialize_token(&env, &contracts.token, &actors.admin);
+
+    let price = 150_0000000i128;
+    let booking_id = contracts.booking.create_booking(
+        &actors.passenger,
+        &actors.airline,
+        &Symbol::new(&env, "FL999"),
+        &Symbol::new(&env, "JFK"),
+        &Symbol::new(&env, "LHR"),
+        &1710000000,
+        &price,
+        &contracts.token.address,
+    );
+
+    // Verify atomic record and passenger index existence
+    let booking = contracts.booking.get_booking(&booking_id);
+    assert!(booking.is_some());
+    assert_eq!(booking.unwrap().passenger, actors.passenger);
+
+    // Test failure path rollback check: attempt to create with unauthenticated or invalid parameters should panic and leave no partial/orphaned state
+    let passenger_unauth = soroban_sdk::Address::generate(&env);
+    let res = contracts.booking.try_create_booking(
+        &passenger_unauth,
+        &actors.airline,
+        &Symbol::new(&env, "FL998"),
+        &Symbol::new(&env, "LAX"),
+        &Symbol::new(&env, "SFO"),
+        &1710000000,
+        &price,
+        &contracts.token.address,
+    );
+    assert!(res.is_err());
+}

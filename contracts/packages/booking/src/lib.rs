@@ -159,7 +159,9 @@ impl BookingContract {
             created_at: env.ledger().timestamp(),
         };
 
+        // Perform atomic persistence of booking and passenger metadata index record
         BookingStorage::set(&env, booking_id, &booking);
+        env.storage().persistent().set(&(&booking.passenger, booking_id), &booking_id);
 
         // Canonical schema: (actor, timestamp, primary_id, ...payload)
         contract_events::emit(

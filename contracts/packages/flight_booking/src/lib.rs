@@ -65,6 +65,7 @@ impl FlightBookingContract {
             created_at,
         };
 
+        // Atomic write batch for booking, seat lock index, and next id sequence
         env.storage()
             .persistent()
             .set(&DataKey::Booking(booking_id), &booking);

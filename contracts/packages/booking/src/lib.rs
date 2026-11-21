@@ -288,7 +288,6 @@ impl BookingContract {
                 || booking.status == symbol_short!("pending"),
             "Booking cannot be refunded"
         );
-
         if booking.amount_escrowed > 0 {
             let token_client = token::Client::new(&env, &booking.token);
             token_client.transfer(

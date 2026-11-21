@@ -65,9 +65,12 @@ impl FlightBookingContract {
             created_at,
         };
 
+        let booking_key = DataKey::Booking(booking_id);
+        assert!(!env.storage().persistent().has(&booking_key), "Booking conflict");
+        assert!(!env.storage().persistent().has(&seat_key), "Seat conflict");
         env.storage()
             .persistent()
-            .set(&DataKey::Booking(booking_id), &booking);
+            .set(&booking_key, &booking);
         env.storage().persistent().set(&seat_key, &booking_id);
         env.storage()
             .instance()

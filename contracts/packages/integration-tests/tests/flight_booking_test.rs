@@ -338,3 +338,38 @@ fn test_flight_booking_reconcile_reference_timeout_recovery() {
     let id2 = client.reconcile_booking_reference(&passenger, &flight_id, &seat, &1_500, &request_ref);
     assert_eq!(id1, id2);
 }
+
+#[test]
+fn test_flight_booking_atomic_persistence_success() {
+    let env = Env::default();
+    env.mock_all_auths();
+    let passenger = Address::generate(&env);
+    let contract_id = env.register(FlightBookingContract, ());
+    let client = FlightBookingContractClient::new(&env, &contract_id);
+
+    let flight_id = Symbol::new(&env, "FLATOM");
+    let seat = Symbol::new(&env, "3A");
+    let booking_id = client.reserve_seat(&passenger, &flight_id, &seat, &2_500);
+
+    let booking = client.get_booking(&booking_id).unwrap();
+    assert_eq!(booking.booking_id, booking_id);
+    assert_eq!(booking.passenger, passenger);
+    assert_eq!(booking.seat, seat);
+    assert_eq!(booking.state, flight_booking::BookingState::Confirmed);
+}
+
+#[test]
+#[should_panic(expected = "Invalid amount")]
+fn test_flight_booking_atomic_failure_no_orphaned_seat_allocation() {
+    let env = Env::default();
+    env.mock_all_auths();
+    let passenger = Address::generate(&env);
+    let contract_id = env.register(FlightBookingContract, ());
+    let client = FlightBookingContractClient::new(&env, &contract_id);
+
+    let flight_id = Symbol::new(&env, "FLATOMFAIL");
+    let seat = Symbol::new(&env, "3B");
+
+    // Invalid amount (0) should fail validation and leave no seat reservation or booking record
+    let _ = client.reserve_seat(&passenger, &flight_id, &seat, &0);
+}

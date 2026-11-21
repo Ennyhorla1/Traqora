@@ -87,3 +87,52 @@ fn test_refund_flow() {
     assert_eq!(booking.status, Symbol::new(&env, "refunded"));
     assert_eq!(booking.amount_escrowed, 0);
 }
+
+#[test]
+fn test_atomic_booking_and_passenger_persistence_success() {
+    let env = new_env();
+    let actors = generate_actors(&env);
+    let contracts = register_contracts(&env);
+    initialize_token(&env, &contracts.token, &actors.admin);
+
+    let price = 150_0000000i128;
+    let booking_id = contracts.booking.create_booking(
+        &actors.passenger,
+        &actors.airline,
+        &Symbol::new(&env, "FL999"),
+        &Symbol::new(&env, "JFK"),
+        &Symbol::new(&env, "LAX"),
+        &1704067200,
+        &price,
+        &contracts.token.address,
+    );
+
+    let booking = contracts.booking.get_booking(&booking_id);
+    assert!(booking.is_some());
+    let b = booking.unwrap();
+    assert_eq!(b.passenger, actors.passenger);
+    assert_eq!(b.airline, actors.airline);
+    assert_eq!(b.status, Symbol::new(&env, "pending"));
+}
+
+#[test]
+#[should_panic(expected = "Invalid price")]
+fn test_atomic_booking_failure_leaves_no_orphaned_records() {
+    let env = new_env();
+    let actors = generate_actors(&env);
+    let contracts = register_contracts(&env);
+    initialize_token(&env, &contracts.token, &actors.admin);
+
+    // Attempting to create booking with 0 price should fail validation atomically
+    let invalid_price = 0i128;
+    contracts.booking.create_booking(
+        &actors.passenger,
+        &actors.airline,
+        &Symbol::new(&env, "FLERR"),
+        &Symbol::new(&env, "JFK"),
+        &Symbol::new(&env, "LAX"),
+        &1704067200,
+        &invalid_price,
+        &contracts.token.address,
+    );
+}

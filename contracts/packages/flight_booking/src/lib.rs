@@ -65,9 +65,14 @@ impl FlightBookingContract {
             created_at,
         };
 
+        // Atomically write both booking and seat allocation data ensuring no partial writes
+        let booking_key = DataKey::Booking(booking_id);
+        assert!(!env.storage().persistent().has(&booking_key), "Booking already exists");
+        assert!(!env.storage().persistent().has(&seat_key), "Seat already reserved");
+
         env.storage()
             .persistent()
-            .set(&DataKey::Booking(booking_id), &booking);
+            .set(&booking_key, &booking);
         env.storage().persistent().set(&seat_key, &booking_id);
         env.storage()
             .instance()

@@ -174,9 +174,6 @@ impl BookingContract {
                 booking.passenger.clone(),
                 env.ledger().timestamp(),
                 booking_id,
-                booking.airline.clone(),
-                booking.flight_number.clone(),
-                booking.price,
             ),
         );
 

@@ -59,6 +59,14 @@ pub struct BatchCompleteBookingsResult {
 
 pub struct BookingStorage;
 
+#[contracttype]
+#[derive(Clone)]
+pub struct PassengerRecord {
+    pub passenger: Address,
+    pub booking_id: u64,
+    pub registered_at: u64,
+}
+
 const MAX_BATCH_SIZE: u32 = 50;
 
 impl BookingStorage {
@@ -67,7 +75,15 @@ impl BookingStorage {
     }
 
     pub fn set(env: &Env, booking_id: u64, booking: &Booking) {
+        let passenger_record = PassengerRecord {
+            passenger: booking.passenger.clone(),
+            booking_id,
+            registered_at: booking.created_at,
+        };
         env.storage().persistent().set(&booking_id, booking);
+        env.storage()
+            .persistent()
+            .set(&(symbol_short!("pass"), booking_id), &passenger_record);
     }
 
     pub fn get_trusted_oracle(env: &Env) -> Option<Address> {

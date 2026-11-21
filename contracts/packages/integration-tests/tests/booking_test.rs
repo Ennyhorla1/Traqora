@@ -20,6 +20,8 @@ fn test_payment_escrow_flow() {
         &1704067200,
         &price,
         &contracts.token.address,
+        &soroban_sdk::String::from_str(&env, "Alice Doe"),
+        &soroban_sdk::String::from_str(&env, "AB123456"),
     );
 
     let booking = contracts.booking.get_booking(&booking_id).unwrap();
@@ -53,6 +55,41 @@ fn test_payment_escrow_flow() {
 }
 
 #[test]
+fn test_atomic_booking_and_passenger_persistence() {
+    let env = new_env();
+    let actors = generate_actors(&env);
+    let contracts = register_contracts(&env);
+    initialize_token(&env, &contracts.token, &actors.admin);
+
+    let price = 150_0000000i128;
+    let booking_id = contracts.booking.create_booking(
+        &actors.passenger,
+        &actors.airline,
+        &Symbol::new(&env, "FL999"),
+        &Symbol::new(&env, "JFK"),
+        &Symbol::new(&env, "LAX"),
+        &1704067200,
+        &price,
+        &contracts.token.address,
+        &soroban_sdk::String::from_str(&env, "Bob Smith"),
+        &soroban_sdk::String::from_str(&env, "XY987654"),
+    );
+
+    let booking = contracts.booking.get_booking(&booking_id).unwrap();
+    assert_eq!(booking.passenger, actors.passenger);
+    assert_eq!(booking.airline, actors.airline);
+    assert_eq!(booking.price, price);
+    assert_eq!(
+        booking.passenger_record.name,
+        soroban_sdk::String::from_str(&env, "Bob Smith")
+    );
+    assert_eq!(
+        booking.passenger_record.passport_number,
+        soroban_sdk::String::from_str(&env, "XY987654")
+    );
+}
+
+#[test]
 fn test_refund_flow() {
     let env = new_env();
     env.ledger().set_timestamp(1700000000);
@@ -73,6 +110,8 @@ fn test_refund_flow() {
         &departure_time,
         &price,
         &contracts.token.address,
+        &soroban_sdk::String::from_str(&env, "Charlie Brown"),
+        &soroban_sdk::String::from_str(&env, "ZZ111222"),
     );
 
     contracts

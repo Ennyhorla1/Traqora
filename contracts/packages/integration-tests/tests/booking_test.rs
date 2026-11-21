@@ -89,47 +89,28 @@ fn test_refund_flow() {
 }
 
 #[test]
-fn test_atomic_booking_persistence_and_failure_paths() {
+#[should_panic(expected = "Seat already reserved")]
+fn test_seat_conflict_fails() {
     let env = new_env();
     let actors = generate_actors(&env);
     let contracts = register_contracts(&env);
-    initialize_token(&env, &contracts.token, &actors.admin);
 
     let price = 100_0000000i128;
+    let flight_id = Symbol::new(&env, "FL123");
+    let seat = Symbol::new(&env, "12A");
 
-    // Verify normal path: booking is successfully created and persisted atomically
-    let booking_id = contracts.booking.create_booking(
+    contracts.flight_booking.reserve_seat(
         &actors.passenger,
-        &actors.airline,
-        &Symbol::new(&env, "FL999"),
-        &Symbol::new(&env, "JFK"),
-        &Symbol::new(&env, "LAX"),
-        &1704067200,
+        &flight_id,
+        &seat,
         &price,
-        &contracts.token.address,
     );
 
-    let booking = contracts.booking.get_booking(&booking_id);
-    assert!(booking.is_some());
-    let b = booking.unwrap();
-    assert_eq!(b.passenger, actors.passenger);
-    assert_eq!(b.status, Symbol::new(&env, "pending"));
-
-    // Verify failure / validation path: invalid amount panics and leaves no partial/corrupted records or state anomalies
-    let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
-        contracts.booking.create_booking(
-            &actors.passenger,
-            &actors.airline,
-            &Symbol::new(&env, "FL998"),
-            &Symbol::new(&env, "JFK"),
-            &Symbol::new(&env, "LAX"),
-            &1704067200,
-            &-50i128,
-            &contracts.token.address,
-        );
-    }));
-    assert!(result.is_err());
-
-    // Ensure next booking ID increments properly and no orphaned record exists for non-existent id
-    assert!(contracts.booking.get_booking(&(booking_id + 100)).is_none());
+    // Attempting to reserve the exact same seat again should fail atomically
+    contracts.flight_booking.reserve_seat(
+        &actors.passenger,
+        &flight_id,
+        &seat,
+        &price,
+    );
 }

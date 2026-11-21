@@ -547,3 +547,5 @@ let events = server.get_events(GetEventsRequest {
   `env.events().publish` with hand-written topic literals is what this schema
   exists to prevent. `contracts/packages/shared/events` is the only place a new
   domain or action symbol may be introduced, and it must be added here too.
+
+| `booking` | `created` | `(passenger, timestamp, booking_id, airline, flight_number, price, passenger_name, passport_number)` |

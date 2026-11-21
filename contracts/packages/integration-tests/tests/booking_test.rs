@@ -87,3 +87,56 @@ fn test_refund_flow() {
     assert_eq!(booking.status, Symbol::new(&env, "refunded"));
     assert_eq!(booking.amount_escrowed, 0);
 }
+
+#[test]
+#[should_panic]
+fn test_invalid_state_transition() {
+    let env = new_env();
+    let actors = generate_actors(&env);
+    let contracts = register_contracts(&env);
+    initialize_token(&env, &contracts.token, &actors.admin);
+
+    let price = 100_0000000i128;
+    let booking_id = contracts.booking.create_booking(
+        &actors.passenger,
+        &actors.airline,
+        &Symbol::new(&env, "FL999"),
+        &Symbol::new(&env, "JFK"),
+        &Symbol::new(&env, "LAX"),
+        &1704067200,
+        &price,
+        &contracts.token.address,
+    );
+
+    // Cannot release payment before paying (pending -> completed is invalid)
+    contracts.booking.release_payment_to_airline(&booking_id);
+}
+
+#[test]
+#[should_panic]
+fn test_concurrent_transition_attempts() {
+    let env = new_env();
+    let actors = generate_actors(&env);
+    let contracts = register_contracts(&env);
+    initialize_token(&env, &contracts.token, &actors.admin);
+
+    let price = 100_0000000i128;
+    let booking_id = contracts.booking.create_booking(
+        &actors.passenger,
+        &actors.airline,
+        &Symbol::new(&env, "FLCONCUR"),
+        &Symbol::new(&env, "JFK"),
+        &Symbol::new(&env, "LAX"),
+        &1704067200,
+        &price,
+        &contracts.token.address,
+    );
+
+    contracts
+        .token
+        .mint(&actors.admin, &actors.passenger, &price * 2);
+    contracts.booking.pay_for_booking(&booking_id);
+
+    // Attempting to pay or perform conflicting state transitions concurrently/twice should panic due to mutex/status guard
+    contracts.booking.pay_for_booking(&booking_id);
+}

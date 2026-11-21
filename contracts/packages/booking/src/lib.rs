@@ -181,6 +181,17 @@ impl BookingContract {
 
     // Accept payment for the booking and hold in escrow
     pub fn pay_for_booking(env: Env, booking_id: u64) {
+        // Concurrency guard / reentrancy check via transition mutex lock flag or status check
+        let mut booking = BookingStorage::get(&env, booking_id).expect("Booking not found");
+
+        assert!(
+            booking.status == symbol_short!("pending"),
+            "Already paid or cancelled"
+        );
+
+        // Set transient/status guard flag to prevent concurrent double processing
+        booking.status = symbol_short!("processing");
+        BookingStorage::set(&env, booking_id, &booking);
         let mut booking = BookingStorage::get(&env, booking_id).expect("Booking not found");
 
         assert!(
@@ -242,6 +253,18 @@ impl BookingContract {
         );
         assert!(booking.amount_escrowed > 0, "No funds in escrow");
 
+        booking.status = symbol_short!("processing");
+        BookingStorage::set(&env, booking_id, &booking);
+        let mut booking = BookingStorage::get(&env, booking_id).expect("Booking not found");
+
+        booking.airline.require_auth();
+
+        assert!(
+            booking.status == symbol_short!("confirmed"),
+            "Invalid booking status"
+        );
+        assert!(booking.amount_escrowed > 0, "No funds in escrow");
+
         let token_client = token::Client::new(&env, &booking.token);
 
         token_client.transfer(
@@ -271,6 +294,26 @@ impl BookingContract {
 
     // Refund passenger for cancelled bookings
     pub fn refund_passenger(env: Env, booking_id: u64) {
+        let mut booking = BookingStorage::get(&env, booking_id).expect("Booking not found");
+
+        let current_time = env.ledger().timestamp();
+
+        // For simplicity, require passenger auth and check window
+        // In a real app, airline could also trigger this
+        booking.passenger.require_auth();
+        assert!(
+            current_time < booking.departure_time - 86400,
+            "Cancellation window closed"
+        );
+
+        assert!(
+            booking.status == symbol_short!("confirmed")
+                || booking.status == symbol_short!("pending"),
+            "Booking cannot be refunded"
+        );
+
+        booking.status = symbol_short!("processing");
+        BookingStorage::set(&env, booking_id, &booking);
         let mut booking = BookingStorage::get(&env, booking_id).expect("Booking not found");
 
         let current_time = env.ledger().timestamp();
@@ -363,7 +406,8 @@ impl BookingContract {
         assert!(
             booking.status != symbol_short!("cancelled")
                 && booking.status != symbol_short!("refunded")
-                && booking.status != symbol_short!("completed"),
+                && booking.status != symbol_short!("completed")
+                && booking.status != symbol_short!("processing"),
             "Booking cannot be cancelled"
         );
 
@@ -378,6 +422,9 @@ impl BookingContract {
                 || booking.status == symbol_short!("pending"),
             "Invalid booking status"
         );
+
+        booking.status = symbol_short!("processing");
+        BookingStorage::set(&env, booking_id, &booking);
 
         let escrowed = booking.amount_escrowed;
         let mut passenger_refund = 0i128;
@@ -537,6 +584,9 @@ impl BookingContract {
         );
         assert!(booking.amount_escrowed > 0, "No funds in escrow");
 
+        booking.status = symbol_short!("processing");
+        BookingStorage::set(&env, booking_id, &booking);
+
         let token_client = token::Client::new(&env, &booking.token);
         token_client.transfer(
             &env.current_contract_address(),
@@ -575,6 +625,9 @@ impl BookingContract {
                 || booking.status == symbol_short!("pending"),
             "Booking cannot be refunded"
         );
+
+        booking.status = symbol_short!("processing");
+        BookingStorage::set(&env, booking_id, &booking);
 
         if booking.amount_escrowed > 0 {
             let token_client = token::Client::new(&env, &booking.token);

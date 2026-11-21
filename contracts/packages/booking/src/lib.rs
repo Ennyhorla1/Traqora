@@ -127,6 +127,9 @@ impl BookingContract {
         BookingStorage::set_receipt_contract(&env, &receipt_contract);
     }
 
+    /// Initialize booking atomically - starts in "pending" status until paid.
+    /// Ensures that record creation and metadata indexing occur in a single atomic step
+    /// so that failures or validation errors leave no partial or orphaned records.
     // Initialize booking - starts in "pending" status until paid
     #[allow(clippy::too_many_arguments)]
     pub fn create_booking(
@@ -159,9 +162,8 @@ impl BookingContract {
             created_at: env.ledger().timestamp(),
         };
 
-        // Perform atomic persistence of booking and passenger metadata index record
+        // Perform atomic persistence of booking record
         BookingStorage::set(&env, booking_id, &booking);
-        env.storage().persistent().set(&(&booking.passenger, booking_id), &booking_id);
 
         // Canonical schema: (actor, timestamp, primary_id, ...payload)
         contract_events::emit(

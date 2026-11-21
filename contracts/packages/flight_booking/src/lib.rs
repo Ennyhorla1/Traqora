@@ -78,6 +78,20 @@ impl FlightBookingContract {
 
         contract_events::emit(
             &env,
+            Domain::Booking,
+            Action::Created,
+            (
+                passenger.clone(),
+                created_at,
+                booking_id,
+                flight_id.clone(),
+                seat.clone(),
+                amount,
+            ),
+        );
+
+        contract_events::emit(
+            &env,
             Domain::Seat,
             Action::Reserved,
             (

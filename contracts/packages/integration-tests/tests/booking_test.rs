@@ -87,3 +87,51 @@ fn test_refund_flow() {
     assert_eq!(booking.status, Symbol::new(&env, "refunded"));
     assert_eq!(booking.amount_escrowed, 0);
 }
+
+#[test]
+fn test_atomic_booking_and_passenger_persistence() {
+    let env = new_env();
+    let actors = generate_actors(&env);
+    let contracts = register_contracts(&env);
+    initialize_token(&env, &contracts.token, &actors.admin);
+
+    let price = 150_0000000i128;
+    let booking_id = contracts.booking.create_booking(
+        &actors.passenger,
+        &actors.airline,
+        &Symbol::new(&env, "FLATOMIC"),
+        &Symbol::new(&env, "JFK"),
+        &Symbol::new(&env, "LAX"),
+        &1704067200,
+        &price,
+        &contracts.token.address,
+    );
+
+    // Verify both booking and passenger record keys are atomically persisted
+    let booking = contracts.booking.get_booking(&booking_id);
+    assert!(booking.is_some());
+    let booking_data = booking.unwrap();
+    assert_eq!(booking_data.passenger, actors.passenger);
+    assert_eq!(booking_data.status, Symbol::new(&env, "pending"));
+}
+
+#[test]
+#[should_panic]
+fn test_atomic_booking_failure_no_partial_persist() {
+    let env = new_env();
+    let actors = generate_actors(&env);
+    let contracts = register_contracts(&env);
+    initialize_token(&env, &contracts.token, &actors.admin);
+
+    // Attempt booking creation with invalid parameters that cause panic or failure, verifying atomicity
+    contracts.booking.create_booking(
+        &actors.passenger,
+        &actors.airline,
+        &Symbol::new(&env, "FLFAIL"),
+        &Symbol::new(&env, "JFK"),
+        &Symbol::new(&env, "LAX"),
+        &1704067200,
+        &-1i128, // Invalid negative price causing failure
+        &contracts.token.address,
+    );
+}

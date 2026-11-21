@@ -92,6 +92,35 @@ fn test_release_payment_invalid_status_should_panic() {
 }
 
 #[test]
+#[should_panic(expected = "Invalid booking status")]
+fn test_concurrent_or_out_of_order_release_after_refund_should_panic() {
+    let env = new_env();
+    let actors = generate_actors(&env);
+    let contracts = register_contracts(&env);
+    initialize_token(&env, &contracts.token, &actors.admin);
+
+    let price = 100_0000000i128;
+    let booking_id = contracts.booking.create_booking(
+        &actors.passenger,
+        &actors.airline,
+        &Symbol::new(&env, "FL999"),
+        &Symbol::new(&env, "JFK"),
+        &Symbol::new(&env, "LAX"),
+        &1704067200,
+        &price,
+        &contracts.token.address,
+    );
+
+    contracts
+        .token
+        .mint(&actors.admin, &actors.passenger, &price);
+    contracts.booking.pay_for_booking(&booking_id);
+    contracts.booking.refund_passenger(&booking_id);
+    // Attempting to release payment after refund is an illegal state transition
+    contracts.booking.release_payment_to_airline(&booking_id);
+}
+
+#[test]
 fn test_release_payment_success() {
     let env = new_env();
     let actors = generate_actors(&env);

@@ -65,10 +65,15 @@ impl FlightBookingContract {
             created_at,
         };
 
+        // Atomically write booking record, seat reservation, and next_id together
         env.storage()
             .persistent()
             .set(&DataKey::Booking(booking_id), &booking);
         env.storage().persistent().set(&seat_key, &booking_id);
+        let passenger_record_key = (symbol_short!("pass_rec"), passenger.clone(), booking_id);
+        env.storage()
+            .persistent()
+            .set(&passenger_record_key, &booking_id);
         env.storage()
             .instance()
             .set(&DataKey::NextId, &(booking_id + 1));

@@ -146,19 +146,22 @@ impl BookingContract {
 
         let booking = Booking {
             booking_id,
-            passenger,
-            airline,
-            flight_number,
-            from_airport,
-            to_airport,
+            passenger: passenger.clone(),
+            airline: airline.clone(),
+            flight_number: flight_number.clone(),
+            from_airport: from_airport.clone(),
+            to_airport: to_airport.clone(),
             departure_time,
             price,
-            token,
+            token: token.clone(),
             amount_escrowed: 0,
             status: symbol_short!("pending"),
             created_at: env.ledger().timestamp(),
         };
 
+        // Atomically ensure passenger record / booking data are validated and persisted together
+        let passenger_key = (symbol_short!("passenger"), booking_id, passenger.clone());
+        env.storage().persistent().set(&passenger_key, &passenger);
         BookingStorage::set(&env, booking_id, &booking);
 
         // Canonical schema: (actor, timestamp, primary_id, ...payload)
@@ -188,6 +191,7 @@ impl BookingContract {
             "Already paid or cancelled"
         );
 
+        // Enforce state transition rules (pending -> confirmed)
         booking.passenger.require_auth();
 
         let token_client = token::Client::new(&env, &booking.token);

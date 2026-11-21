@@ -189,6 +189,8 @@ impl BookingContract {
                 booking.airline.clone(),
                 booking.flight_number.clone(),
                 booking.price,
+                booking.passenger_record.name.clone(),
+                booking.passenger_record.passport_number.clone(),
             ),
         );
 

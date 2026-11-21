@@ -26,6 +26,15 @@ pub trait BookingReceiptInterface {
 
 #[contracttype]
 #[derive(Clone)]
+pub struct PassengerRecord {
+    pub passenger: Address,
+    pub booking_id: u64,
+    pub email: String,
+    pub created_at: u64,
+}
+
+#[contracttype]
+#[derive(Clone)]
 pub struct Booking {
     pub booking_id: u64,
     pub passenger: Address,
@@ -68,6 +77,16 @@ impl BookingStorage {
 
     pub fn set(env: &Env, booking_id: u64, booking: &Booking) {
         env.storage().persistent().set(&booking_id, booking);
+    }
+
+    pub fn set_passenger_record(env: &Env, booking_id: u64, record: &PassengerRecord) {
+        let passenger_key = (symbol_short!("passenger"), booking_id);
+        env.storage().persistent().set(&passenger_key, record);
+    }
+
+    pub fn get_passenger_record(env: &Env, booking_id: u64) -> Option<PassengerRecord> {
+        let passenger_key = (symbol_short!("passenger"), booking_id);
+        env.storage().persistent().get(&passenger_key)
     }
 
     pub fn get_trusted_oracle(env: &Env) -> Option<Address> {
@@ -146,7 +165,7 @@ impl BookingContract {
 
         let booking = Booking {
             booking_id,
-            passenger,
+            passenger: passenger.clone(),
             airline,
             flight_number,
             from_airport,
@@ -159,7 +178,15 @@ impl BookingContract {
             created_at: env.ledger().timestamp(),
         };
 
+        let passenger_record = PassengerRecord {
+            passenger: passenger.clone(),
+            booking_id,
+            email: String::from_str(&env, "passenger@traqora.io"),
+            created_at: env.ledger().timestamp(),
+        };
+
         BookingStorage::set(&env, booking_id, &booking);
+        BookingStorage::set_passenger_record(&env, booking_id, &passenger_record);
 
         // Canonical schema: (actor, timestamp, primary_id, ...payload)
         contract_events::emit(

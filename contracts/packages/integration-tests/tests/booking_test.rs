@@ -87,3 +87,61 @@ fn test_refund_flow() {
     assert_eq!(booking.status, Symbol::new(&env, "refunded"));
     assert_eq!(booking.amount_escrowed, 0);
 }
+
+#[test]
+fn test_atomic_booking_and_passenger_record_persistence() {
+    let env = new_env();
+    let actors = generate_actors(&env);
+    let contracts = register_contracts(&env);
+    initialize_token(&env, &contracts.token, &actors.admin);
+
+    let price = 120_0000000i128;
+
+    let booking_id = contracts.booking.create_booking(
+        &actors.passenger,
+        &actors.airline,
+        &Symbol::new(&env, "FL999"),
+        &Symbol::new(&env, "JFK"),
+        &Symbol::new(&env, "LHR"),
+        &1704067200,
+        &price,
+        &contracts.token.address,
+    );
+
+    let booking = contracts.booking.get_booking(&booking_id).unwrap();
+    assert_eq!(booking.booking_id, booking_id);
+    assert_eq!(booking.passenger, actors.passenger);
+    assert_eq!(booking.price, price);
+    assert_eq!(booking.status, Symbol::new(&env, "pending"));
+
+    // Verify passenger record is created atomically with the booking
+    let passenger_key = (soroban_sdk::symbol_short!("passenger"), booking_id);
+    let passenger_record: booking::PassengerRecord = env
+        .as_contract(&contracts.booking.address, || {
+            env.storage().persistent().get(&passenger_key).unwrap()
+        });
+    assert_eq!(passenger_record.passenger, actors.passenger);
+    assert_eq!(passenger_record.booking_id, booking_id);
+}
+
+#[test]
+#[should_panic]
+fn test_atomic_booking_creation_fails_without_auth() {
+    let env = new_env();
+    let actors = generate_actors(&env);
+    let contracts = register_contracts(&env);
+    initialize_token(&env, &contracts.token, &actors.admin);
+
+    // Creating booking without mock auth or passenger auth should panic atomically
+    env.clear_auths();
+    contracts.booking.create_booking(
+        &actors.passenger,
+        &actors.airline,
+        &Symbol::new(&env, "FL999"),
+        &Symbol::new(&env, "JFK"),
+        &Symbol::new(&env, "LHR"),
+        &1704067200,
+        &120_0000000i128,
+        &contracts.token.address,
+    );
+}

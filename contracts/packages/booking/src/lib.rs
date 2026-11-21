@@ -26,6 +26,13 @@ pub trait BookingReceiptInterface {
 
 #[contracttype]
 #[derive(Clone)]
+pub struct PassengerRecord {
+    pub name: String,
+    pub passport_number: String,
+}
+
+#[contracttype]
+#[derive(Clone)]
 pub struct Booking {
     pub booking_id: u64,
     pub passenger: Address,
@@ -39,6 +46,7 @@ pub struct Booking {
     pub amount_escrowed: i128,
     pub status: Symbol, // "pending", "confirmed", "completed", "cancelled", "refunded"
     pub created_at: u64,
+    pub passenger_record: PassengerRecord,
 }
 
 #[contracttype]
@@ -139,14 +147,21 @@ impl BookingContract {
         departure_time: u64,
         price: i128,
         token: Address,
+        passenger_name: String,
+        passport_number: String,
     ) -> u64 {
         passenger.require_auth();
 
         let booking_id = BookingStorage::next_id(&env);
 
+        let passenger_record = PassengerRecord {
+            name: passenger_name,
+            passport_number,
+        };
+
         let booking = Booking {
             booking_id,
-            passenger,
+            passenger: passenger.clone(),
             airline,
             flight_number,
             from_airport,
@@ -157,6 +172,7 @@ impl BookingContract {
             amount_escrowed: 0,
             status: symbol_short!("pending"),
             created_at: env.ledger().timestamp(),
+            passenger_record,
         };
 
         BookingStorage::set(&env, booking_id, &booking);
@@ -173,6 +189,8 @@ impl BookingContract {
                 booking.airline.clone(),
                 booking.flight_number.clone(),
                 booking.price,
+                booking.passenger_record.name.clone(),
+                booking.passenger_record.passport_number.clone(),
             ),
         );
 

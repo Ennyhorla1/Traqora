@@ -70,6 +70,10 @@ impl BookingStorage {
         env.storage().persistent().set(&booking_id, booking);
     }
 
+    pub fn remove(env: &Env, booking_id: u64) {
+        env.storage().persistent().remove(&booking_id);
+    }
+
     pub fn get_trusted_oracle(env: &Env) -> Option<Address> {
         env.storage().instance().get(&symbol_short!("oracle"))
     }
@@ -159,6 +163,7 @@ impl BookingContract {
             created_at: env.ledger().timestamp(),
         };
 
+        // Ensure atomic persistence of booking and any related state
         BookingStorage::set(&env, booking_id, &booking);
 
         // Canonical schema: (actor, timestamp, primary_id, ...payload)
